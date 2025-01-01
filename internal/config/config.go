@@ -7,12 +7,12 @@ import (
 )
 
 type Config struct {
-	PasswordStorePath  string `yaml:"password_store_path"`
+	SecretStorePath    string `yaml:"secret_store_path"`
 	DigestedPassphrase string `yaml:"digested_passphrase"`
 }
 
 func (config *Config) IsComplete() bool {
-	return config.PasswordStorePath != "" && config.DigestedPassphrase != ""
+	return config.SecretStorePath != "" && config.DigestedPassphrase != ""
 }
 
 func (config *Config) Save(path string) error {

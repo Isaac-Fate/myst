@@ -54,3 +54,6 @@ Thumbs.db
 # Ignore local development files
 local/
 tmp/
+
+# Test field
+test-field/

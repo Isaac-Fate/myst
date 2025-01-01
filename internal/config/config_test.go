@@ -11,7 +11,7 @@ import (
 
 func TestConfig(t *testing.T) {
 	config := config.Config{
-		PasswordStorePath:  "/path/to/password-store.db",
+		SecretStorePath:    "/path/to/secret-store.db",
 		DigestedPassphrase: "xxxx",
 	}
 
@@ -24,7 +24,7 @@ func TestConfig(t *testing.T) {
 }
 func TestWriteConfig(t *testing.T) {
 	config := config.Config{
-		PasswordStorePath:  "/path/to/password-store.db",
+		SecretStorePath:    "/path/to/secret-store.db",
 		DigestedPassphrase: "xxxx",
 	}
 

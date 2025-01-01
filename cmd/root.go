@@ -23,7 +23,7 @@ var cfg config.Config
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "myst",
-	Short: "MyST (My SecreTs) -- A Password Manager",
+	Short: "MyST (My SecreTs) -- A Simple Secret Value Manager",
 	Long:  ``,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
@@ -182,7 +182,7 @@ func setConfig(configPath string) error {
 	}
 
 	// Set the cfg
-	cfg.PasswordStorePath = passwordStorePath
+	cfg.SecretStorePath = passwordStorePath
 	cfg.DigestedPassphrase = mycrypto.DigestPassphrase(passphrase)
 
 	// Save the config
