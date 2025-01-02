@@ -1,96 +1,98 @@
 # MyST (My SecreTs)
 
-MyST is a secure command-line secret manager that helps you store and manage sensitive information like passwords, API keys, and other credentials.
+A secure command-line secret manager for storing and managing sensitive information like passwords, API keys, and other credentials.
 
 ## Features
 
-- 🔐 **Secure Storage**: All secrets are encrypted using AES-GCM with a master passphrase
-- 🔍 **Fast Search**: Full-text search capabilities for finding secrets quickly
-- 📋 **Clipboard Integration**: Copy secret values directly to clipboard
-- 🖥️ **Interactive CLI**: User-friendly interface with both arrow key navigation and command typing
-- 🔒 **Local Storage**: All data is stored locally in `~/.myst/`
+- 🔐 **Secure Storage**: AES-GCM encryption with master passphrase
+- 🔍 **Fast Search**: Full-text search through secrets
+- 📋 **Clipboard Support**: Copy secret values directly to clipboard
+- 🖥️ **Interactive CLI**: Arrow key navigation and command typing
+- 🔒 **Local Storage**: All data stored locally in `~/.myst/`
 
 ## Installation
 
-```sh
+### From Source
+```bash
+# Clone the repository
+git clone https://github.com/Isaac-Fate/myst.git
+cd myst
+
+# Build for your platform
+make build
+
+# Or build for all platforms
+make build-all
+```
+
+### Using Go
+```bash
 go install github.com/Isaac-Fate/myst@latest
 ```
 
-## Quick Start
+## Usage
 
-1. Run MyST:
-
-```sh
+### First Time Setup
+```bash
 myst
 ```
+You'll be prompted to set a master passphrase (minimum 8 characters) which will be used to encrypt/decrypt your secrets.
 
-2. First-time setup:
-   - Set your master passphrase (min 8 characters)
-   - This passphrase will encrypt/decrypt your secrets
-
-3. Use the interactive menu to manage your secrets
-
-## Commands
+### Available Commands
 
 - `add`: Add a new secret
   ```
-  Key: github-token
+  Key: my-api-key
   Value: [hidden]
-  Website (optional): github.com
-  Notes (optional): Personal access token
+  Website (optional): api.example.com
+  Notes (optional): Production API key
   ```
 
-- `find`: Search secrets
-  - Search by key, website, or notes
-  - For each secret:
+- `find`: Search secrets by key/website/notes
+  - Options for each secret:
     - Display in terminal
     - Copy to clipboard
     - Skip
 
 - `list`: View all secrets
-  - Shows all stored secrets
-  - Select any to view/copy value
+  - Select any secret to:
+    - Display value
+    - Copy to clipboard
+    - Skip
 
-- `update`: Modify secrets
-  - Select a secret
-  - Update:
-    - Value
-    - Website
-    - Notes
+- `update`: Modify existing secrets
+  - Update value/website/notes
+  - Requires confirmation
 
 - `remove`: Delete secrets
-  - Select a secret
-  - Confirm deletion
+  - Select secret to remove
+  - Requires confirmation
 
-- `help`: Show help
+### Navigation
 
-- `quit`: Exit
-
-## Navigation
-
-- Use ↑/↓ arrows to navigate
-- Type commands directly
-- Enter to select
-- Ctrl+C to cancel
-
-## Security
-
-- AES-GCM encryption
-- Master passphrase never stored
-- Local SQLite database
-- Separate search index
+- ↑/↓: Navigate options
+- Type: Quick command access
+- Enter: Select option
+- Ctrl+C: Cancel operation
 
 ## Development
 
 ### Requirements
-
 - Go 1.21+
-- SQLite3
+- Make
 
-### Build
+### Build Commands
+```bash
+# Build for current platform
+make build
 
-```sh
-git clone https://github.com/Isaac-Fate/myst.git
-cd myst
-go build
+# Build for all platforms
+make build-all
+
+# Clean build artifacts
+make clean
 ```
+
+## License
+
+MIT License
