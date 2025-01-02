@@ -7,189 +7,208 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
 
+	"github.com/Isaac-Fate/myst/cmd/context"
+	"github.com/Isaac-Fate/myst/cmd/handlers"
 	"github.com/Isaac-Fate/myst/internal/config"
 	mycrypto "github.com/Isaac-Fate/myst/internal/crypto"
-	"github.com/Isaac-Fate/myst/internal/utils"
+	"github.com/Isaac-Fate/myst/internal/manager"
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
 )
 
-// Configuration this program
-var cfg config.Config
+// Global context for the application
+var appContext = context.AppContext{}
 
-// rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
 	Use:   "myst",
-	Short: "MyST (My SecreTs) -- A Password Manager",
-	Long:  ``,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	Run: func(cmd *cobra.Command, args []string) {
-		// Print the help message
-		cmd.Help()
+	Short: "MyST (My SecreTs) -- A Simple Secret Value Manager",
+	Long:  `A simple and secure secret manager for storing and retrieving sensitive information.`,
+	RunE: func(cmd *cobra.Command, args []string) error {
+		// First, ensure we have a valid configuration
+		if err := initializeConfig(); err != nil {
+			return err
+		}
+
+		// Prompt for passphrase
+		if err := loadPassphrase(); err != nil {
+			return err
+		}
+
+		// Then initialize the secret manager
+		if err := initializeSecretManager(); err != nil {
+			return err
+		}
+
+		// Start the interactive command loop
+		return startCommandLoop()
 	},
 }
 
-// Execute adds all child commands to the root command and sets flags appropriately.
-// This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
-	err := rootCmd.Execute()
-	if err != nil {
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Println(err)
 		os.Exit(1)
 	}
 }
 
-func init() {
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
-
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.myst.yaml)")
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
-
-	// Load the configuration
-	// Prompt the user to set the configuration if it doesn't exist
-	err := loadConfig()
-	if err != nil {
-		fmt.Println(err)
-	}
-
-}
-
-func getDataDir() (string, error) {
-	// Get the home directory
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-
-	// The data directory of this program is ~/.myst
-	dataDir := filepath.Join(homeDir, "myst")
-
-	// Create the data directory if it doesn't exist
-	err = os.MkdirAll(dataDir, 0755)
-	if err != nil {
-		return "", err
-	}
-
-	return dataDir, nil
-}
-
-func getConfigPath() (string, error) {
-	// Get the data directory
-	dataDir, err := getDataDir()
-	if err != nil {
-		return "", err
-	}
-
-	// The config file of this program is ~/myst/config.yml
-	configPath := filepath.Join(dataDir, "config.yml")
-
-	return configPath, nil
-}
-
-func loadConfig() error {
-	// Get the config path
-	configPath, err := getConfigPath()
-	if err != nil {
-		return err
-	}
-
-	// Load the configuration, set the global variable cfg
-	cfg, err = config.LoadConfig(configPath)
-
+// Initialize the configuration
+func initializeConfig() error {
+	// Try to load existing config
+	err := config.LoadConfig(&appContext.Config)
 	if err == nil {
 		return nil
 	}
 
-	// Guide the user to set the config
+	// If config doesn't exist, create it
 	if errors.Is(err, os.ErrNotExist) {
-		return setConfig(configPath)
+		if err := createInitialConfig(); err != nil {
+			return fmt.Errorf("failed to create initial configuration: %w", err)
+		}
+		return nil
 	}
+
+	return err
+}
+
+func createInitialConfig() error {
+	fmt.Println("🔐 Welcome to MyST! Let's set up your secret store.")
+
+	// Prompt for passphrase
+	passphrasePrompt := promptui.Prompt{
+		Label: "Enter your master passphrase (min 8 characters)",
+		Mask:  '*',
+		Validate: func(input string) error {
+			if len(input) < 8 {
+				return errors.New("passphrase must be at least 8 characters")
+			}
+			return nil
+		},
+	}
+
+	passphrase, err := passphrasePrompt.Run()
+	if err != nil {
+		return err
+	}
+
+	// Create and save the configuration
+	appContext.Config = config.Config{
+		DigestedPassphrase: mycrypto.DigestPassphrase(passphrase),
+	}
+
+	if err := config.Save(&appContext.Config); err != nil {
+		return err
+	}
+
+	fmt.Println("✅ Configuration created successfully!")
+	return nil
+}
+
+// Load the passphrase from the user
+func loadPassphrase() error {
+	passphrasePrompt := promptui.Prompt{
+		Label: "🔑 Enter your master passphrase",
+		Mask:  '*',
+	}
+
+	inputPassphrase, err := passphrasePrompt.Run()
+	if err != nil {
+		return err
+	}
+
+	// Verify the passphrase
+	if !mycrypto.VerifyPassphrase(inputPassphrase, appContext.Config.DigestedPassphrase) {
+		return errors.New("wrong passphrase")
+	}
+
+	// Set the passphrase
+	appContext.Passphrase = inputPassphrase
 
 	return nil
 }
 
-func setConfig(configPath string) error {
-	// Prompt to set the filepath of the password store database
-	setPasswordStorePathPrompt := promptui.Prompt{
-		Label: "🔐 Enter the filepath of the password store",
-		Validate: func(passwordStorePath string) error {
-			// Resolve the path
-			passwordStorePath, err := utils.ResolvePath(passwordStorePath)
-			if err != nil {
-				return err
-			}
-
-			// Check if the file exists
-			_, err = os.Stat(passwordStorePath)
-			if err == nil {
-				return errors.New("the file at the specified path already exists")
-			}
-
-			// Check if the path ends with .db
-			if !strings.HasSuffix(passwordStorePath, ".db") {
-				return errors.New("password store path must end with .db")
-			}
-
-			return nil
-		},
-	}
-
-	// Get the input path of the password store
-	passwordStorePath, err := setPasswordStorePathPrompt.Run()
-
+func initializeSecretManager() error {
+	var err error
+	appContext.SecretManager, err = manager.NewSecretManager(config.SecretStorePath(), config.SecretIndexPath())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to initialize secret manager: %w", err)
 	}
-
-	// Resolve the path
-	passwordStorePath, err = utils.ResolvePath(passwordStorePath)
-	if err != nil {
-		return err
-	}
-
-	// Create the parent directory if it doesn't exist
-	err = os.MkdirAll(filepath.Dir(passwordStorePath), 0755)
-	if err != nil {
-		return err
-	}
-
-	// Prompt to set the passphrase
-	setPassphrasePrompt := promptui.Prompt{
-		Label: "🔑 Enter the passphrase",
-		Validate: func(passphrase string) error {
-			// Check if the passphrase is at least 8 characters long
-			if len(passphrase) < 8 {
-				return errors.New("passphrase must be at least 8 characters long")
-			}
-
-			return nil
-		},
-		Mask: '*',
-	}
-
-	passphrase, err := setPassphrasePrompt.Run()
-
-	if err != nil {
-		return err
-	}
-
-	// Set the cfg
-	cfg.PasswordStorePath = passwordStorePath
-	cfg.DigestedPassphrase = mycrypto.DigestPassphrase(passphrase)
-
-	// Save the config
-	err = cfg.Save(configPath)
-	if err != nil {
-		return err
-	}
-
 	return nil
+}
+
+func startCommandLoop() error {
+	commands := []struct {
+		Name        string
+		Description string
+		Handler     func(appContext *context.AppContext) error
+	}{
+		{"add", "Add a new secret", handlers.AddSecret},
+		{"find", "Search for secrets", handlers.FindSecrets},
+		{"list", "List all secrets", handlers.ListSecrets},
+		{"update", "Update an existing secret", handlers.UpdateSecret},
+		{"remove", "Remove a secret", handlers.RemoveSecret},
+		{"help", "Show help message", handlers.ShowHelp},
+		{"quit", "Exit the application", nil},
+	}
+
+	// Create a map for quick command lookup
+	commandToHandlerMap := make(map[string]func(appContext *context.AppContext) error)
+	for _, cmd := range commands {
+		commandToHandlerMap[cmd.Name] = cmd.Handler
+	}
+
+	for {
+		prompt := promptui.Select{
+			Label: "Select an action (or type a command)",
+			Items: commands,
+			Templates: &promptui.SelectTemplates{
+				Label:    "{{ . }}",
+				Active:   "▸ {{ .Name | cyan }} - {{ .Description }}",
+				Inactive: "  {{ .Name | white }} - {{ .Description }}",
+				Selected: "✔ {{ .Name | green }} - {{ .Description }}",
+			},
+			// Enable searching through commands
+			Searcher: func(input string, index int) bool {
+				cmd := commands[index]
+				input = strings.ToLower(input)
+				name := strings.ToLower(cmd.Name)
+				return strings.HasPrefix(name, input)
+			},
+		}
+
+		i, inputCommand, err := prompt.Run()
+
+		if err != nil {
+			if err == promptui.ErrInterrupt {
+				return nil
+			}
+			return err
+		}
+
+		// Handle the typed command if it's a direct match
+		if handler, exists := commandToHandlerMap[strings.ToLower(inputCommand)]; exists {
+			if handler == nil { // quit command
+				fmt.Println("👋 Goodbye!")
+				return nil
+			}
+			if err := handler(&appContext); err != nil {
+				fmt.Printf("Error: %v\n", err)
+			}
+			continue
+		}
+
+		// Handle the selected command
+
+		// Handle the quit command
+		if commands[i].Name == "quit" {
+			fmt.Println("👋 Goodbye!")
+			return nil
+		}
+
+		// Handle other commands
+		if err := commands[i].Handler(&appContext); err != nil {
+			fmt.Printf("Error: %v\n", err)
+		}
+	}
 }
