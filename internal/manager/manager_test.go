@@ -7,6 +7,7 @@ import (
 
 	"github.com/Isaac-Fate/myst/internal/manager"
 	"github.com/Isaac-Fate/myst/internal/models"
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 )
 
@@ -18,6 +19,7 @@ func TestAddSecret(t *testing.T) {
 	}
 
 	err = secretManager.AddSecret(&models.Secret{
+		ID:             uuid.New(),
 		Key:            "test-secret",
 		EncryptedValue: "xxx",
 		Notes:          "this is a test secret",
@@ -44,6 +46,76 @@ func TestFindSecrets(t *testing.T) {
 
 	for _, secret := range secrets {
 		t.Log(secret)
+	}
+}
+
+func TestUpdateSecret(t *testing.T) {
+	secretManager, err := createSecretManager()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// First create a secret
+	secret := &models.Secret{
+		ID:             uuid.New(),
+		Key:            "update-test-secret",
+		EncryptedValue: "original-value",
+		Notes:          "original notes",
+	}
+
+	err = secretManager.AddSecret(secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Update the secret
+	secret.Notes = "updated notes"
+	secret.EncryptedValue = "new-value"
+
+	err = secretManager.UpdateSecret(secret)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Verify the update
+	updated, err := secretManager.GetSecret(secret.ID.String())
+	if err != nil {
+		t.Error(err)
+	}
+
+	if updated.Notes != "updated notes" {
+		t.Errorf("expected updated notes, got %s", updated.Notes)
+	}
+}
+
+func TestRemoveSecret(t *testing.T) {
+	secretManager, err := createSecretManager()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// First create a secret
+	secret := &models.Secret{
+		Key:            "remove-test-secret",
+		EncryptedValue: "test-value",
+		Notes:          "test notes",
+	}
+
+	err = secretManager.AddSecret(secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Remove the secret
+	err = secretManager.RemoveSecret(secret)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Verify the removal
+	_, err = secretManager.GetSecret(secret.ID.String())
+	if err == nil {
+		t.Error("expected error when getting removed secret")
 	}
 }
 

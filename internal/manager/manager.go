@@ -1,6 +1,8 @@
 package manager
 
 import (
+	"fmt"
+
 	"github.com/Isaac-Fate/myst/internal/database"
 	"github.com/Isaac-Fate/myst/internal/models"
 	"github.com/Isaac-Fate/myst/internal/search"
@@ -83,5 +85,68 @@ func (manager *SecretManager) FindSecrets(query string) ([]models.Secret, error)
 	// Commit
 	tx.Commit()
 
+	return secrets, nil
+}
+
+// UpdateSecret updates an existing secret in both the database and search index
+func (manager *SecretManager) UpdateSecret(secret *models.Secret) error {
+	// Create a transaction
+	tx := manager.db.Begin()
+
+	// Update the secret in the database
+	err := tx.Save(secret).Error
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// Update the secret in the search index
+	err = search.UpdateSecret(manager.index, secret)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// Commit the transaction
+	tx.Commit()
+	return nil
+}
+
+// RemoveSecret removes a secret from both the database and search index
+func (manager *SecretManager) RemoveSecret(secret *models.Secret) error {
+	// Create a transaction
+	tx := manager.db.Begin()
+
+	// Remove the secret from the database
+	err := tx.Delete(secret).Error
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// Remove the secret from the search index
+	err = search.RemoveSecret(manager.index, secret)
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	// Commit the transaction
+	tx.Commit()
+	return nil
+}
+
+// GetSecret retrieves a secret by its ID
+func (manager *SecretManager) GetSecret(id string) (*models.Secret, error) {
+	return database.GetSecret(manager.db, id)
+}
+
+// ListSecrets returns all secrets in the database
+func (manager *SecretManager) ListSecrets() ([]models.Secret, error) {
+	var secrets []models.Secret
+	err := manager.db.Find(&secrets).Error
+	if err != nil {
+		return nil, fmt.Errorf("failed to list secrets: %w", err)
+	}
 	return secrets, nil
 }
