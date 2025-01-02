@@ -5,6 +5,7 @@ import (
 
 	"github.com/Isaac-Fate/myst/cmd/context"
 	mycrypto "github.com/Isaac-Fate/myst/internal/crypto"
+	"github.com/atotto/clipboard"
 	"github.com/manifoldco/promptui"
 )
 
@@ -31,21 +32,22 @@ func ListSecrets(appContext *context.AppContext) error {
 		}
 	}
 
-	// Ask if user wants to view any secret values
+	// Ask if user wants to view/copy any secret values
 	viewPrompt := promptui.Prompt{
-		Label:     "View any secret values",
+		Label:     "View or copy any secret values",
 		IsConfirm: true,
 	}
 
 	if result, err := viewPrompt.Run(); err == nil && result == "y" {
-		// Create a selection prompt for secrets
+		// Create items for selection
 		items := make([]string, len(secrets))
 		for i, s := range secrets {
-			items[i] = fmt.Sprintf("%s (%s)", s.Key, s.Notes)
+			items[i] = fmt.Sprintf("[%d] %s (%s)", i+1, s.Key, s.Notes)
 		}
 
+		// Let user select which secret to view/copy
 		selectPrompt := promptui.Select{
-			Label: "Select a secret to view",
+			Label: "Select a secret",
 			Items: items,
 			Size:  10, // Show 10 items at a time if list is long
 		}
@@ -55,13 +57,42 @@ func ListSecrets(appContext *context.AppContext) error {
 			return err
 		}
 
-		// Decrypt and show the selected secret value
 		selectedSecret := secrets[idx]
+
+		// Ask what to do with the selected secret
+		actionPrompt := promptui.Select{
+			Label: "Choose action",
+			Items: []string{
+				"Skip",
+				"Display in terminal",
+				"Copy to clipboard",
+			},
+		}
+
+		actionIdx, _, err := actionPrompt.Run()
+		if err != nil {
+			return err
+		}
+
+		if actionIdx == 0 { // Skip
+			return nil
+		}
+
+		// Decrypt the secret value
 		decryptedValue, err := mycrypto.Decrypt(appContext.Passphrase, selectedSecret.EncryptedValue)
 		if err != nil {
 			return fmt.Errorf("failed to decrypt secret value: %w", err)
 		}
-		fmt.Printf("\n🔒 Value for '%s': %s\n", selectedSecret.Key, decryptedValue)
+
+		switch actionIdx {
+		case 1: // Display in terminal
+			fmt.Printf("\n🔒 Value for '%s': %s\n", selectedSecret.Key, decryptedValue)
+		case 2: // Copy to clipboard
+			if err := clipboard.WriteAll(decryptedValue); err != nil {
+				return fmt.Errorf("failed to copy to clipboard: %w", err)
+			}
+			fmt.Printf("\n✅ Value for '%s' copied to clipboard\n", selectedSecret.Key)
+		}
 	}
 
 	return nil

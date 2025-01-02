@@ -108,7 +108,7 @@ func createInitialConfig() error {
 // Load the passphrase from the user
 func loadPassphrase() error {
 	passphrasePrompt := promptui.Prompt{
-		Label: "Enter your master passphrase (min 8 characters)",
+		Label: "🔑 Enter your master passphrase",
 		Mask:  '*',
 	}
 
@@ -146,6 +146,7 @@ func startCommandLoop() error {
 		{"add", "Add a new secret", handlers.AddSecret},
 		{"find", "Search for secrets", handlers.FindSecrets},
 		{"list", "List all secrets", handlers.ListSecrets},
+		{"update", "Update an existing secret", handlers.UpdateSecret},
 		{"remove", "Remove a secret", handlers.RemoveSecret},
 		{"help", "Show help message", handlers.ShowHelp},
 		{"quit", "Exit the application", nil},
@@ -198,11 +199,14 @@ func startCommandLoop() error {
 		}
 
 		// Handle the selected command
+
+		// Handle the quit command
 		if commands[i].Name == "quit" {
 			fmt.Println("👋 Goodbye!")
 			return nil
 		}
 
+		// Handle other commands
 		if err := commands[i].Handler(&appContext); err != nil {
 			fmt.Printf("Error: %v\n", err)
 		}
